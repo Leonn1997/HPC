@@ -8,7 +8,7 @@ CFLAGS  = -g -Wall -std=c99 -lc -D _BSD_SOURCE -fopenmp -lm
 
 
 # the build target executable:
-TARGET = gameoflife
+TARGET = gameoflife2
 
 all: $(TARGET)
 

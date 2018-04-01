@@ -182,29 +182,39 @@ void game(int w, int h) {
   double *currentfield = calloc(w*h, sizeof(double));
   double *newfield     = calloc(w*h, sizeof(double));
   
-  int numberOfAreas = 2; //LUL
+  int numberOfAreas = 4; //LUL
+  int xSections = 2;
+  int ySections = 2;
   int x1, x2, y1, y2;
 
   int *areaBounds = calloc(numberOfAreas * 4, sizeof(int));
-  int areaWidth = (w/numberOfAreas) + (w % numberOfAreas > 0 ? 1 : 0);
-  int areaHeight = (h/numberOfAreas) + (h % numberOfAreas > 0 ? 1 : 0);
+  int areaWidth = (w/xSections) + (w % xSections > 0 ? 1 : 0);
+  int areaHeight = (h/ySections) + (h % ySections > 0 ? 1 : 0);
 
   filling(currentfield, w, h);
   long t;
   for (t=0;t<TimeSteps;t++) {
     show(currentfield, w, h);
 
-    #pragma omp parallel private(x1, x2, y1, y2) firstprivate(areaHeight, areaWidth, w, h, numberOfAreas) num_threads(numberOfAreas) 
+    #pragma omp parallel private(x1, x2, y1, y2) firstprivate(areaHeight, areaWidth, w, h, xSections, ySections) shared(areaBounds) num_threads(numberOfAreas) 
     {
 
     // 0 or 1
     int threadId = omp_get_thread_num();
 
-    x1 = areaWidth * (threadId % numberOfAreas);
-    x2 = areaWidth * ((threadId % numberOfAreas) +1) -1;
+    x1 = areaWidth * (threadId % xSections);
+    x2 = (areaWidth * ((threadId % xSections) +1)) -1;
 
-    y1 = areaHeight * (threadId % numberOfAreas);
-    y2 = areaHeight * ((threadId % numberOfAreas) +1) -1;
+    y1 = areaHeight * (threadId / xSections);
+    y2 = (areaHeight * ((threadId / xSections) +1)) -1;
+
+    if(threadId % xSections == (xSections - 1)) {
+      x2 = w - 1;
+    }
+
+    if(threadId / xSections == (h - 1)) {
+      y2 = h - 1;
+    }
 
     evolve(currentfield, newfield, w, h, x1, x2, y1, y2);
     writeVTK2Piece(t, currentfield, "gol", x1, x2, y1, y2, w, h, threadId);
