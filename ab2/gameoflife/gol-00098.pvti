@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<VTKFile type="PImageData" version="0.1" byte_order="LittleEndian" header_type="UInt64">
+<PImageData WholeExtent="0 30 0 30 0 0" Origin="0 0 0" Spacing ="1 1 0" GhostLevel="0">
+<PCellData Scalars="gol">
+<PDataArray type="Float32" Name="gol" format="appended" offset="0"/>
+</PCellData>
+<Piece Extent="0 15 0 15 0 0" Source="gol-00098-00.vti"/>
+<Piece Extent="15 30 15 30 0 0" Source="gol-00098-01.vti"/>
+</PImageData>
+</VTKFile>
