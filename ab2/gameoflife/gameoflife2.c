@@ -187,8 +187,8 @@ void game(int w, int h) {
 
   long t;
   int startX, startY, endX, endY;
-  int xFactor = 2;  // :blush:
-  int yFactor = 2;
+  int xFactor = 16;  // :blush:
+  int yFactor = 16;
   int number_of_areas = xFactor * yFactor;
   int *area_bounds = calloc(number_of_areas * 4, sizeof(int));
   int fieldWidth = (w/ xFactor) + (w % xFactor > 0 ? 1 : 0);
@@ -201,19 +201,32 @@ void game(int w, int h) {
     {
       //printf("fieldWidth=%d\n", fieldWidth);
       //printf("fieldHeight=%d\n", fieldHeight);
-      startX = fieldWidth * (omp_get_thread_num() % xFactor);
-      endX = (fieldWidth * ((omp_get_thread_num() % xFactor) + 1)) - 1;
-      startY = fieldHeight * (omp_get_thread_num() % yFactor);
-      endY = (fieldHeight * ((omp_get_thread_num() % yFactor) + 1)) - 1;
+      int line = (int)floor((omp_get_thread_num() / xFactor));
+      int column = omp_get_thread_num() % xFactor;
+      int lastColumn = (column == (xFactor -1));
+      int lastLine = (line == (yFactor -1));
 
-    
-      if (omp_get_thread_num() == 2) {
-          startY += fieldHeight;
-          endY += fieldHeight;
+      if (yFactor % 2 != 0) {
+        startX = fieldWidth * (omp_get_thread_num() % xFactor);
+        endX = (fieldWidth * ((omp_get_thread_num() % xFactor) + 1)) - 1;
+        startY = fieldHeight * (omp_get_thread_num() % yFactor);
+        endY = (fieldHeight * ((omp_get_thread_num() % yFactor) + 1)) - 1;
       }
-      if (omp_get_thread_num() == 3) {
-          startY -= fieldHeight;
-          endY -= fieldHeight;
+      else {
+        startX = fieldWidth * (omp_get_thread_num() % xFactor);
+        endX = (fieldWidth * ((omp_get_thread_num() % xFactor) + 1)) - 1;
+        startY = fieldHeight * line;
+        endY = (fieldHeight * (line + 1)) - 1;
+      }
+    
+      //rechter Rand
+      if (lastColumn) {
+        endX = w -1;
+      }
+
+      // oberer Rand
+      if (lastLine) {
+        endY = h - 1;
       }
 
     
