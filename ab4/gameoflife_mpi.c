@@ -151,37 +151,11 @@ int countNeighbours(double* currentfield, double* ghostLeft, double* ghostRight,
   return n;
 }
 
-double* readFromASCIIFile(char filename[256], int* w, int* h) {
-    FILE* file = fopen(filename, "r"); /* should check the result */
-
-    int size = 22*13;
-    int character;
-    size_t len = 0;
-    size_t width = 0;
-    size_t height = 0;
-    double* field = calloc(size, sizeof(double));
-
-    while ((character = fgetc(file)) != EOF){
-      if (character == '\n') {
-        if (!width) width = len;
-        height++;
-        continue;
-      }
-      if (character == 'o') field[len++] = 1;
-      if (character == '_') field[len++] = 0;
-      // resize 
-      if(len==size){
-          field = realloc(field, sizeof(double) * (size += 10));
-      }
-    }
-    height++;
-
-    field = realloc(field, sizeof(*field) * len);
-    *w = width;
-    *h = height;
-
-    fclose(file);
-    return field;
+void filling(double* currentfield, int w, int h) {
+  int i;
+  for (i = 0; i < h*w; i++) {
+    currentfield[i] = (rand() < RAND_MAX / 10) ? 1 : 0; ///< init domain randomly
+  }
 }
 /*
 * ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -338,6 +312,7 @@ double* initializeField(int w, int h) {
 
   return field;
 }
+
 void computeSendBuffer(double* field, double* buffer, int w, int h, int num_processes, MPI_Comm communicator) {
   int partialWidth = w / num_processes;
   int sendCount = partialWidth * h;
@@ -384,6 +359,7 @@ int main(int argc, char *argv[]) {
   int sendCount = (w / num_processes) * h;
   double* sendBuffer = (double *)calloc(w * h,sizeof(double));
   double* receiveBuffer = (double *)malloc(sendCount * sizeof(double));
+  
   if (rank == 0) {  
     printf("Number of processes: %d\n", num_processes);
     printf("Sendcount = %d\n", sendCount);
