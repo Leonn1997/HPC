@@ -187,7 +187,7 @@ void game(int w, int h) {
 
   long t;
   int startX, startY, endX, endY;
-  int xFactor = 16;  // :blush:
+  int xFactor = 16;
   int yFactor = 16;
   int number_of_areas = xFactor * yFactor;
   int *area_bounds = calloc(number_of_areas * 4, sizeof(int));
@@ -258,6 +258,7 @@ void game(int w, int h) {
   free(currentfield);
   free(newfield);
   free(area_bounds);
+  
 }
  
 int main(int c, char **v) {
