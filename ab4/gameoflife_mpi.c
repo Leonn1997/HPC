@@ -2,12 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-
 #include <string.h>
 #include <stdbool.h>
 #include <math.h>
 #include <sys/time.h>
-
 #include "mpi.h"
 
 #define calcIndex(width, x,y)  ((y)*(width) + (x))
@@ -86,10 +84,8 @@ void printToFile(double* field,char prefix[1024], int w, int h, int rank) {
 }
 
 void show(double* currentfield, int w, int h) {
-  // printf("\033[H");
   int x,y;
   for (y = 0; y < h; y++) {
-    // for (x = 0; x < w; x++) printf(currentfield[calcIndex(w, x,y)] ? "\033[07m  \033[m" : "  ");
     for (x = 0; x < w; x++) printf(currentfield[calcIndex(w, x,y)] ? "X" : "_");
     printf("\n");
   }
@@ -106,7 +102,7 @@ int evolve(double* currentfield, double* newfield, double* leftGhostLayer, doubl
       
       int n = countNeighbours(currentfield, leftGhostLayer, rightGhostLayer, x, y, w, h);
       int index = calcIndex(w, x, y);
-// dead or alive and 3 neighbours => come alive or stay alive
+      // dead or alive and 3 neighbours => come alive or stay alive
       if (n == 3) {
         newfield[index] = 1;
       }
@@ -138,15 +134,12 @@ int countNeighbours(double* currentfield, double* leftGhostLayer, double* rightG
           n += rightGhostLayer[calcIndex(1, 0, stencilY % h)];
       }
       else {
-        // the modulo operations makes the field be tested in a periodic way
         n += currentfield[calcIndex(w, (stencilX + w) % w, (stencilY + h) % h)];
       }
     }
   }
 
-  // the center of the stencil should not be taken into account
   n -= currentfield[calcIndex(w, x, y)];
-
   return n;
 }
 
@@ -156,20 +149,6 @@ void filling(double* currentfield, int w, int h) {
     currentfield[i] = (rand() < RAND_MAX / 10) ? 1 : 0; ///< init domain randomly
   }
 }
-/*
-* ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* ~ Buffer vs. MPI_Datatype ~
-* ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-* Buffer:
-*   + kein Overhead zum erstellen der Datentypen
-*   + Auf gleichen Systemen schneller durch nicht benötigte Konvertierungen
-*   - Nicht portierbar, interoperabel
-*
-* MPI_Datatype:
-*   + Interoperabel, unabhängig vom System
-*   - mehr Aufwand*
-*
-*/
 
 void printProcessResponsibility(int rank, int w, int h) {
   int startX, endX, startY, endY;
@@ -197,6 +176,13 @@ void printCurrentTimestep(int rank, int timestep) {
     }
 }
 
+void persistentTimeStep(double* currentfield, int rank,  int timestep, int width, int height, int overallWidth, int overallHeight, int numberOfProcesses ) {
+   writeVTK2Piece(timestep, currentfield, "gol", width, height, overallWidth, rank);
+    if (rank == 0) {
+      writeVTK2Container(timestep, "gol", overallWidth, overallHeight, width, numberOfProcesses);
+    }
+}
+
 void game(int overallWidth, int overallHeight, double initialfield[], MPI_Comm communicator, int rank, int numberOfProcesses) {
   int w = (overallWidth / numberOfProcesses);
   int h = overallHeight;
@@ -217,13 +203,9 @@ void game(int overallWidth, int overallHeight, double initialfield[], MPI_Comm c
     shareGhostlayers(leftGhostLayer, rightGhostLayer, h, rank, numberOfProcesses, communicator);
 
     changed = evolve(currentfield, newfield, leftGhostLayer, rightGhostLayer, w, h);
-    writeVTK2Piece(t, currentfield, "gol", w, h, overallWidth, rank);
-
-    if (rank == 0) {
-      writeVTK2Container(t, "gol", overallWidth, overallHeight, w, numberOfProcesses);
-    }
     
-    //SWAP
+    persistentTimeStep(currentfield, rank, t, w, h, overallWidth, overallHeight, numberOfProcesses);
+    
     double *temp = currentfield;
     currentfield = newfield;
     newfield = temp;
@@ -340,7 +322,6 @@ void computeSendBuffer(double* field, double* buffer, int w, int h, int numberOf
       //  | 19 | 20 | 21 | 22 | 23 | 24 |
       index = calcIndex(amountOfFieldsPerProcess, (partialWidth * y) + (x % partialWidth), x / partialWidth);
       buffer[index] = field[calcIndex(w, x, y)];
-      // printf("(%2d, %d) -> (%d, %d)\n", x, y, (partialWidth * y) + (x % partialWidth), x / partialWidth);
     }
   }
 }
