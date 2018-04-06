@@ -1,4 +1,3 @@
-
 #include <endian.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,7 +49,7 @@ void writeVTK2Piece(long timestep, double *data, char prefix[1024], int w, int h
   fclose(fp);
 }
 
-void writeVTK2Container(long timestep, char prefix[1024], long w, long h, int partialWidth, int num_processes) {
+void writeVTK2Container(long timestep, char prefix[1024], long w, long h, int partialWidth, int numberOfProccesses) {
   char filename[2048];
 
   snprintf(filename, sizeof(filename), "%s-%05ld%s", prefix, timestep, ".pvti");
@@ -63,7 +62,7 @@ void writeVTK2Container(long timestep, char prefix[1024], long w, long h, int pa
   fprintf(fp,"<PDataArray type=\"Float32\" Name=\"%s\" format=\"appended\" offset=\"0\"/>\n", prefix);
   fprintf(fp,"</PCellData>\n");
 
-  for(int i = 0; i < num_processes; i++) {
+  for(int i = 0; i < numberOfProccesses; i++) {
     fprintf(fp, "<Piece Extent=\"%d %d %d %d 0 0\" Source=\"%s-%05ld-%02d%s\"/>\n", i * partialWidth, (i + 1) * partialWidth, 0, h, prefix, timestep, i, ".vti");
   }
 
@@ -171,8 +170,8 @@ void filling(double* currentfield, int w, int h) {
 *   - mehr Aufwand*
 *
 */
-void game(int overallWidth, int overallHeight, double initialfield[], MPI_Comm communicator, int rank, int num_processes) {
-  int w = (overallWidth / num_processes);
+void game(int overallWidth, int overallHeight, double initialfield[], MPI_Comm communicator, int rank, int numberOfProccesses) {
+  int w = (overallWidth / numberOfProccesses);
   int h = overallHeight;
   double* currentfield = (double*)calloc(w * h, sizeof(double));
   memcpy(currentfield, initialfield, w * h * sizeof(double));
@@ -196,12 +195,12 @@ void game(int overallWidth, int overallHeight, double initialfield[], MPI_Comm c
     // printToFile(ghostLeft, "ghostLeft", 1,h, rank);
     // printToFile(ghostRight, "ghostRight", 1,h,rank);
 
-    shareGhostlayers(ghostLeft, ghostRight, h, rank, num_processes, communicator);
+    shareGhostlayers(ghostLeft, ghostRight, h, rank, numberOfProccesses, communicator);
     itLives = evolve(currentfield, newfield, ghostLeft, ghostRight, w, h);
     writeVTK2Piece(t, currentfield, "gol", w, h, overallWidth, rank);
 
     if (rank == 0) {
-      writeVTK2Container(t, "gol", overallWidth, overallHeight, w, num_processes);
+      writeVTK2Container(t, "gol", overallWidth, overallHeight, w, numberOfProccesses);
     }
 
     // printToFile(ghostLeft, "sharedLeft", 1,h, rank);
@@ -223,11 +222,11 @@ void game(int overallWidth, int overallHeight, double initialfield[], MPI_Comm c
   free(aliveBuffer);
 }
 
-void shareGhostlayers(double* ghostLeft, double* ghostRight, int sendCount, int rank, int num_processes, MPI_Comm communicator) {
+void shareGhostlayers(double* ghostLeft, double* ghostRight, int sendCount, int rank, int numberOfProccesses, MPI_Comm communicator) {
   double* sendbuffer = (double*)calloc(sendCount, sizeof(double));
   double* receivebuffer = (double*)calloc(sendCount, sizeof(double));;
   if (rank % 2 == 0) {
-    if (rank < num_processes-1) {
+    if (rank < numberOfProccesses-1) {
       fillGhostIntoBuffer(ghostRight, sendbuffer, sendCount);
 
       MPI_Send(sendbuffer, sendCount, MPI_DOUBLE, (rank+1), 1, communicator);
@@ -253,7 +252,7 @@ void shareGhostlayers(double* ghostLeft, double* ghostRight, int sendCount, int 
 
       MPI_Send(sendbuffer, sendCount, MPI_DOUBLE, (rank-1), 2, communicator);
     }
-    if (rank < num_processes-1) {
+    if (rank < numberOfProccesses-1) {
       fillGhostIntoBuffer(ghostRight, sendbuffer, sendCount);
       
       MPI_Recv(receivebuffer, sendCount, MPI_DOUBLE, (rank+1), 3, communicator, MPI_STATUS_IGNORE);
@@ -276,7 +275,7 @@ void shareGhostlayers(double* ghostLeft, double* ghostRight, int sendCount, int 
     fillBufferIntoGhost(receivebuffer, ghostLeft, sendCount);
   }
 
-  if (rank == num_processes-1) {
+  if (rank == numberOfProccesses-1) {
     int neighbour_left, periodic_neighbour_right;
     MPI_Cart_shift(communicator, 0, 1, &neighbour_left, &periodic_neighbour_right);
 
@@ -313,8 +312,8 @@ double* initializeField(int w, int h) {
   return field;
 }
 
-void computeSendBuffer(double* field, double* buffer, int w, int h, int num_processes, MPI_Comm communicator) {
-  int partialWidth = w / num_processes;
+void computeSendBuffer(double* field, double* buffer, int w, int h, int numberOfProccesses, MPI_Comm communicator) {
+  int partialWidth = w / numberOfProccesses;
   int sendCount = partialWidth * h;
   int index;
   for (int y = 0; y < h; y++) {
@@ -334,7 +333,7 @@ void computeSendBuffer(double* field, double* buffer, int w, int h, int num_proc
     }
   }
 }
- 
+
 int main(int argc, char *argv[]) {
   srand(time(NULL));
 
@@ -344,39 +343,62 @@ int main(int argc, char *argv[]) {
   if (w <= 0) w = 21; ///< default width
   if (h <= 0) h = 13; ///< default height
 
-  int rank, num_processes;
+  int rank, numberOfProccesses;
   MPI_Comm world = MPI_COMM_WORLD;
   MPI_Init(&argc, &argv);
-  MPI_Comm_size(world, &num_processes);
-
-  int processes_per_dimension[1] = { num_processes };
-  int is_periodic_per_dimension[1] = { 1 }; // the 1D topology is periodic at it's left and right border
-  MPI_Comm topology_comm;
-  MPI_Cart_create(world, 1, processes_per_dimension, is_periodic_per_dimension, 1, &topology_comm);
-  MPI_Comm_rank(topology_comm, &rank);
-  MPI_Comm_size(topology_comm, &num_processes);
-
-  int sendCount = (w / num_processes) * h;
+  MPI_Comm_size(world, &numberOfProccesses);
+  MPI_Comm topologyCommunicator;
+  // Aufgabe b: Hier ordnen wir die Processe in eine 1D Topologie
+  int processesPerDimension[1] = { numberOfProccesses };
+  int periodic[1] = { 1 }; 
+  MPI_Cart_create(world, 1, processesPerDimension, periodic, 1, &topologyCommunicator); 
+  MPI_Comm_rank(topologyCommunicator, &rank);
+  MPI_Comm_size(topologyCommunicator, &numberOfProccesses);
+  
+  int sendCount = (w / numberOfProccesses) * h;
   double* sendBuffer = (double *)calloc(w * h,sizeof(double));
   double* receiveBuffer = (double *)malloc(sendCount * sizeof(double));
   
+/*
+ AUFGABE 1
+  zeilen drüber defnieren die 1D Topologie
+  Untere Zeilen dinen zur Verfikation wie gefordert
+*/
+ int id;
+ if(rank != 0) {
+  int myRank = rank;
+  MPI_Recv(&id, 1, MPI_INT,(rank-1), 1, topologyCommunicator, MPI_STATUS_IGNORE); 
+  printf("Ich bin Prozess %i und mein linker Nachbar ist %i \n", myRank, id);
+ }
+ if (rank < numberOfProccesses-1) { 
+  int myRank = rank;
+  MPI_Send(&myRank, 1, MPI_INT,(rank+1), 1, topologyCommunicator);
+  MPI_Recv(&id, 1, MPI_INT,(rank+1), 2, topologyCommunicator, MPI_STATUS_IGNORE);
+  printf("Ich bin Prozess %i und mein rechter Nachbar ist %i \n", myRank, id);
+ }
+  if (rank != 0) { 
+  int myRank = rank; 
+  MPI_Send(&myRank, 1, MPI_INT,(rank-1), 2, topologyCommunicator); 
+}
+  
+
+  /*
   if (rank == 0) {  
-    printf("Number of processes: %d\n", num_processes);
+    printf("Number of processes: %d\n", numberOfProccesses);
     printf("Sendcount = %d\n", sendCount);
     double* field = initializeField(w, h);
     printf("Field:\n");
     show(field, w, h);
 
-    computeSendBuffer(field, sendBuffer, w, h, num_processes, topology_comm);
+    computeSendBuffer(field, sendBuffer, w, h, numberOfProccesses, topologyCommunicator);
     printf("\nSendBuffer:\n");
-    show(sendBuffer, sendCount, num_processes);
+    show(sendBuffer, sendCount, numberOfProccesses);
   }
+  */
   // MPI_Scatter to distribute to all other processes
-  MPI_Scatter(sendBuffer, sendCount, MPI_DOUBLE, receiveBuffer, sendCount, MPI_DOUBLE, 0, topology_comm);
+  MPI_Scatter(sendBuffer, sendCount, MPI_DOUBLE, receiveBuffer, sendCount, MPI_DOUBLE, 0, topologyCommunicator);
 
-  // printf("\nReceiveBuffer (rank %d):\n", rank);
-  // show(receiveBuffer, w / num_processes, h);
-  game(w, h, receiveBuffer, topology_comm, rank, num_processes);
+  // game(w, h, receiveBuffer, topologyCommunicator, rank, numberOfProccesses);
 
   free(sendBuffer);
   free(receiveBuffer);
