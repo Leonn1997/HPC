@@ -4,9 +4,9 @@
 int main() {
 
 
-    #pragma omp parallel //remove this line for ex1a
+    #pragma omp parallel //remove this line for 1 a)
     printf("Hello, World! from Thread %d of %d \n", omp_get_thread_num(), omp_get_max_threads()); //ex1b
-    //ex1c order of threads change
+    //1c) order of threads in the output change
 
 
     printf("-------------------------------------------------\n");
@@ -14,7 +14,7 @@ int main() {
     char lang_en[] = "Hello World!.";
     char lang_de[] = "Servus Welt!.";
     char lang_it[] = "Ciao mondo!";
-    char lang_fr[] = "Bonjour t o u t l e monde!";
+    char lang_fr[] = "Bonjour tout le monde!";
 
 
     #pragma omp parallel sections firstprivate(lang_en, lang_de, lang_it, lang_fr)
