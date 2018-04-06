@@ -39,7 +39,7 @@ omp_init_lock(&lockb);
 
   #pragma omp sections nowait
     {
-      // Section 1 hat a gelockt und danach eine Berechnung durchgeführt, Section 2 hat b gelockt und eine Berechnugn durchgeführt. Danach wollten beide Sections a respektive b locken, die aber von der jeweils anderen Section bereits belegt waren
+      // Section 1 hat zunächst a gelockt und danach eine Berechnung durchgeführt, Section 2 hat erst b gelockt und eine Berechnung durchgeführt. Danach wollten beide Sections a respektive b locken, die aber von der jeweils anderen Section bereits belegt waren
     #pragma omp section
       {
       printf("Thread %d initializing a[]\n",tid);

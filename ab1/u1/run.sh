@@ -1,3 +1,3 @@
-cc -Wall -std=c99 -D _BSD_SOURCE -fopenmp -o hpcu1 helloWorld.c
+cc -Wall -std=c99 -D _BSD_SOURCE -fopenmp -o helloWorld helloWorld.c
 
-OPEN_NUM_THREADS=4 ./hpcu1
+OPEN_NUM_THREADS=4 ./helloWorld

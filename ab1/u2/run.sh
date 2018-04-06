@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-cc -Wall -std=c99 -D _BSD_SOURCE -fopenmp -o hpcu1 error1.c
+cc -Wall -std=c99 -D _BSD_SOURCE -fopenmp -o error1 error1.c
 
-cc -Wall -std=c99 -D _BSD_SOURCE -fopenmp -o hpcu2 error2.c
+cc -Wall -std=c99 -D _BSD_SOURCE -fopenmp -o error2 error2.c
 
-OPEN_NUM_THREADS=4 ./hpcu1
+OPEN_NUM_THREADS=4 ./error1
 
 echo ""
 echo ""
@@ -12,7 +12,7 @@ echo "--------------------------------------------------------------------------
 echo ""
 echo ""
 
-OPEN_NUM_THREADS=4 ./hpcu2
+OPEN_NUM_THREADS=4 ./error2
 
 echo ""
 echo ""

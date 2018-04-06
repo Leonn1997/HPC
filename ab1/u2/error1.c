@@ -83,7 +83,7 @@ void print_results(float array[N], int tid, int section)
     printf("\n");
   } /*** end of critical ***/
 
- // #pragma omp barrier Durch die Barriere wartet der Code darauf, dass alle Threads die Barriere erreichen, es können aber nur 2 Threads die Barriere errreichen durch 2 Sections
+ // #pragma omp barrier Durch die Barriere wartet der Code darauf, dass alle Threads die Barriere erreichen, es können aber nur 2 Threads die Barriere erreichen durch die 2 definierten Sections
   printf("Thread %d done and synchronized.\n", tid); 
 
 }

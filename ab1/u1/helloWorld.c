@@ -11,8 +11,8 @@ int main() {
 
     printf("-------------------------------------------------\n");
 
-    char lang_en[] = "Hello World!.";
-    char lang_de[] = "Servus Welt!.";
+    char lang_en[] = "Hello World!";
+    char lang_de[] = "Servus Welt!";
     char lang_it[] = "Ciao mondo!";
     char lang_fr[] = "Bonjour tout le monde!";
 
