@@ -1,4 +1,3 @@
-
 #include <endian.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,7 +58,7 @@ void writeVTK2Piece(long timestep, double *data, char prefix[1024],int xStart, i
   fclose(fp);
 }
 
-void writeVTK2Container(long timestep, double *data, char prefix[1024], long w, long h, int *area_bounds, int num_threads) {
+void writeVTK2Container(long timestep, double *data, char prefix[1024], long w, long h, int *areaVertices, int num_threads) {
   char filename[2048];  
   int x,y; 
   
@@ -81,7 +80,7 @@ void writeVTK2Container(long timestep, double *data, char prefix[1024], long w, 
 
   for(int i = 0; i < num_threads; i++) {
     fprintf(fp, "<Piece Extent=\"%d %d %d %d 0 0\" Source=\"%s-%05ld-%02d%s\"/>\n",
-      area_bounds[i * 4], area_bounds[i * 4 + 1] + 1, area_bounds[i * 4 + 2], area_bounds[i * 4 + 3] + 1, prefix, timestep, i, ".vti");
+      areaVertices[i * 4], areaVertices[i * 4 + 1] + 1, areaVertices[i * 4 + 2], areaVertices[i * 4 + 3] + 1, prefix, timestep, i, ".vti");
   }
 
   fprintf(fp,"</PImageData>\n");
@@ -95,7 +94,6 @@ void show(double* currentfield, int w, int h) {
   int x,y;
   for (y = 0; y < h; y++) {
     for (x = 0; x < w; x++) printf(currentfield[calcIndex(w, x,y)] ? "\033[07m  \033[m" : "  ");
-    //printf("\033[E");
     printf("\n");
   }
   fflush(stdout);
@@ -128,125 +126,79 @@ void evolve(double* currentfield, double* newfield, int startX, int endX, int st
 
 int countNeighbours(double* currentfield, int x, int y, int width, int height) {
   int n = 0;
-for (int stencilX = (x-1); stencilX <= (x+1); stencilX++) {
-    for (int stencilY = (y-1); stencilY <= (y+1); stencilY++) {
-      // the modulo operations makes the field be tested in a periodic way
-      n += currentfield[calcIndex(width, (stencilX + width) % width, (stencilY + height) % height)];
+  for (int neighbourX = (x-1); neighbourX <= (x+1); neighbourX++) {
+    for (int neighbourY = (y-1); neighbourY <= (y+1); neighbourY++) {
+      n += currentfield[calcIndex(width, (neighbourX + width) % width, (neighbourY + height) % height)];
     }
   }
 
-  // the center of the stencil should not be taken into account
   n -= currentfield[calcIndex(width, x, y)];
 
   return n;
 }
 
-double* readFromASCIIFile(char filename[256], int* w, int* h) {
-    FILE* file = fopen(filename, "r"); /* should check the result */
-
-    int size = 10*10;
-    int character;
-    size_t len = 0;
-    size_t width = 0;
-    size_t height = 0;
-    double* field = calloc(size, sizeof(double));
-
-    while ((character = fgetc(file)) != EOF){
-      if (character == '\n') {
-        if (!width) width = len;
-        height++;
-        continue;
-      }
-      if (character == 'o') field[len++] = 1;
-      if (character == '_') field[len++] = 0;
-      // resize 
-      if(len==size){
-          field = realloc(field, sizeof(double) * (size += 10));
-      }
-    }
-    height++;
-
-    field = realloc(field, sizeof(*field) * len);
-    *w = width;
-    *h = height;
-
-    fclose(file);
-    return field;
-
-  // int i;
-  // for (i = 0; i < h*w; i++) {
-  //   currentfield[i] = (rand() < RAND_MAX / 10) ? 1 : 0; ///< init domain randomly
-  // }
-}
- 
 void game(int w, int h) {
   double *currentfield = calloc(w*h, sizeof(double));
   double *newfield     = calloc(w*h, sizeof(double));
-  //printf("size unsigned %d, size long %d\n",sizeof(float), sizeof(long));
   filling(currentfield, w, h);
 
-  long t;
+  long timestep;
   int startX, startY, endX, endY;
-  int xFactor = 16;
-  int yFactor = 16;
-  int number_of_areas = xFactor * yFactor;
-  int *area_bounds = calloc(number_of_areas * 4, sizeof(int));
-  int fieldWidth = (w/ xFactor) + (w % xFactor > 0 ? 1 : 0);
-  int fieldHeight = (h/ yFactor) + (h % yFactor > 0 ? 1 : 0);
+  int xSections = 16;
+  int ySections = 16;
+  int numberOfAreas = xSections * ySections;
+  int *areaVertices = calloc(numberOfAreas * 4, sizeof(int));
+  int areaWidth = (w / xSections) + (w % xSections > 0 ? 1 : 0);
+  int areaHeight = (h / ySections) + (h % ySections > 0 ? 1 : 0);
 
-  for (t=0;t<TimeSteps;t++) {
+  for (timestep=0;t<TimeSteps;t++) {
     show(currentfield, w, h);
         
-    #pragma omp parallel private(startX, startY, endX, endY) firstprivate(fieldWidth, fieldHeight, xFactor, yFactor, w, h) shared(area_bounds) num_threads(number_of_areas)
+    #pragma omp parallel private(startX, startY, endX, endY) firstprivate(areaWidth, areaHeight, xSections, ySections, w, h) shared(areaVertices) num_threads(numberOfAreas)
     {
-      //printf("fieldWidth=%d\n", fieldWidth);
-      //printf("fieldHeight=%d\n", fieldHeight);
-      int line = (int)floor((omp_get_thread_num() / xFactor));
-      int column = omp_get_thread_num() % xFactor;
-      int lastColumn = (column == (xFactor -1));
-      int lastLine = (line == (yFactor -1));
 
-      if (yFactor % 2 != 0) {
-        startX = fieldWidth * (omp_get_thread_num() % xFactor);
-        endX = (fieldWidth * ((omp_get_thread_num() % xFactor) + 1)) - 1;
-        startY = fieldHeight * (omp_get_thread_num() % yFactor);
-        endY = (fieldHeight * ((omp_get_thread_num() % yFactor) + 1)) - 1;
+      int threadID = omp_get_thread_num();
+      int line = (int)floor((threadID / xSections));
+      int column = threadID % xSections;
+      int lastColumn = (column == (xSections -1));
+      int lastLine = (line == (ySections -1));
+
+      // different calculation of sections if ySections is odd!
+      if (ySections % 2 != 0) {
+        startX = areaWidth * (threadID % xSections);
+        endX = (areaWidth * ((threadID % xSections) + 1)) - 1;
+        startY = areaHeight * (threadID % ySections);
+        endY = (areaHeight * ((threadID % ySections) + 1)) - 1;
       }
       else {
-        startX = fieldWidth * (omp_get_thread_num() % xFactor);
-        endX = (fieldWidth * ((omp_get_thread_num() % xFactor) + 1)) - 1;
-        startY = fieldHeight * line;
-        endY = (fieldHeight * (line + 1)) - 1;
+        startX = areaWidth * (threadID % xSections);
+        endX = (areaWidth * ((threadID % xSections) + 1)) - 1;
+        startY = areaHeight * line;
+        endY = (areaHeight * (line + 1)) - 1;
       }
     
-      //rechter Rand
+      //right edge
       if (lastColumn) {
         endX = w -1;
       }
 
-      // oberer Rand
+      // upper edge
       if (lastLine) {
         endY = h - 1;
       }
-
-    
       
-
-      //printf("Thread %d has area: [%d..%d][%d..%d]\n", omp_get_thread_num(), startX, endX, startY, endY);
-      
-
       evolve(currentfield, newfield, startX, endX, startY, endY, w, h);
-      writeVTK2Piece(t,currentfield,"gol", startX, endX, startY, endY, w, h, omp_get_thread_num());
-      area_bounds[omp_get_thread_num() * 4] = startX;
-      area_bounds[omp_get_thread_num() * 4 + 1] = endX;
-      area_bounds[omp_get_thread_num() * 4 + 2] = startY;
-      area_bounds[omp_get_thread_num() * 4 + 3] = endY;
+      writeVTK2Piece(timestep, currentfield, "gol", startX, endX, startY, endY, w, h, threadID);
+      areaVertices[threadID * 4 + 0] = startX;
+      areaVertices[threadID * 4 + 1] = endX;
+      areaVertices[threadID * 4 + 2] = startY;
+      areaVertices[threadID * 4 + 3] = endY;
     }
 
-    writeVTK2Container(t,currentfield,"gol", w, h, area_bounds, number_of_areas);
+    writeVTK2Container(timestep, currentfield, "gol", w, h, areaVertices, numberOfAreas);
     
     
-    printf("%ld timestep\n",t);
+    printf("%ld timestep\n",timestep);
     usleep(200000);
 
     //SWAP
@@ -257,7 +209,7 @@ void game(int w, int h) {
   
   free(currentfield);
   free(newfield);
-  free(area_bounds);
+  free(areaVertices);
   
 }
  

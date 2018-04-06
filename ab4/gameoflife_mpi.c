@@ -125,16 +125,16 @@ int evolve(double* currentfield, double* newfield, double* leftGhostLayer, doubl
 int countNeighbours(double* currentfield, double* leftGhostLayer, double* rightGhostLayer, int x, int y, int w, int h) {
   int n = 0;
 
-  for (int stencilX = (x-1); stencilX <= (x+1); stencilX++) {
-    for (int stencilY = (y-1); stencilY <= (y+1); stencilY++) {
-      if (stencilX == -1) {
-          n += leftGhostLayer[calcIndex(1, 0, stencilY % h)];
+  for (int neighbourX = (x-1); neighbourX <= (x+1); neighbourX++) {
+    for (int neighbourY = (y-1); neighbourY <= (y+1); neighbourY++) {
+      if (neighbourX == -1) {
+          n += leftGhostLayer[calcIndex(1, 0, neighbourY % h)];
       }
-      else if (stencilX == w) {
-          n += rightGhostLayer[calcIndex(1, 0, stencilY % h)];
+      else if (neighbourX == w) {
+          n += rightGhostLayer[calcIndex(1, 0, neighbourY % h)];
       }
       else {
-        n += currentfield[calcIndex(w, (stencilX + w) % w, (stencilY + h) % h)];
+        n += currentfield[calcIndex(w, (neighbourX + w) % w, (neighbourY + h) % h)];
       }
     }
   }
